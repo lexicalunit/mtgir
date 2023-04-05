@@ -1,0 +1,7 @@
+#!/bin/bash -ue
+
+tput bold
+echo
+poetry run mtgir "$1"
+echo
+tput sgr0

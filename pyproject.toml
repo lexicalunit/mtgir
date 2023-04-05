@@ -1,0 +1,60 @@
+[tool.poetry]
+authors = ["lexicalunit <lexicalunit@lexicalunit.com>"]
+description = ""
+license = "MIT"
+name = "mtgir"
+packages = [
+  {include = "mtgir", from = "src"},
+]
+readme = "README.md"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+click = "^8.1"
+efficientnet = "^1.1"
+opencv-python = "^4.7"
+python = ">=3.10, <3.12"
+requests = "^2.28"
+tensorflow = {version = "<=2.12", markers = "sys_platform != 'darwin'"}
+tensorflow-macos = {version = "<=2.12", markers = "sys_platform == 'darwin'"}
+tensorflow-metal = {version = "<=0.8", markers = "sys_platform == 'darwin'"}
+
+[tool.poetry.group.dev.dependencies]
+black = "^23"
+coverage = "^7"
+pyright = "^1"
+pytest = "^7"
+pytest-cov = "^4"
+ruff = "^0"
+
+[tool.poetry.scripts]
+mtgir = 'mtgir:main'
+
+[tool.black]
+include = '\.pyi?$'
+line-length = 100
+
+[tool.pylint]
+max-line-length = 100
+
+[tool.pyright]
+enableTypeIgnoreComments = true
+reportMissingParameterType = true
+reportMissingTypeArgument = true
+typeCheckingMode = "basic"
+
+[tool.ruff]
+exclude = [".git", "env"]
+ignore = ["E", "W"]
+line-length = 100
+select = ["F", "E501", "T203", "I001"] # "T201"
+target-version = "py310"
+
+[tool.pytest.ini_options]
+addopts = """
+    -W ignore::DeprecationWarning --no-header --cov --cov-report=html -vv
+"""
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
