@@ -11,13 +11,12 @@ version = "0.1.0"
 
 [tool.poetry.dependencies]
 click = "^8.1"
-efficientnet = "^1.1"
+imagehash = "^4.3"
+numpy = "^1.24"
 opencv-python = "^4.7"
 python = ">=3.10, <3.12"
 requests = "^2.28"
-tensorflow = {version = "<=2.12", markers = "sys_platform != 'darwin'"}
-tensorflow-macos = {version = "<=2.12", markers = "sys_platform == 'darwin'"}
-tensorflow-metal = {version = "<=0.8", markers = "sys_platform == 'darwin'"}
+shapely = "^2.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23"
@@ -52,7 +51,7 @@ target-version = "py310"
 
 [tool.pytest.ini_options]
 addopts = """
-    -W ignore::DeprecationWarning --no-header --cov --cov-report=html -vv
+    -W ignore::DeprecationWarning --no-header --cov=mtgir --cov-report=html -vv
 """
 
 [build-system]

@@ -41,6 +41,7 @@ poetry run pytest
 
 ## Research
 
+- [tmikonen/magic_card_detector](https://github.com/tmikonen/magic_card_detector)
 - [OpenCV Python Feature Detection Cheatsheet](https://github.com/methylDragon/opencv-python-reference/blob/master/02%20OpenCV%20Feature%20Detection%20and%20Description.md)
 - [ORB (Oriented FAST and Rotated BRIEF) OpenCV Tutorial](https://docs.opencv.org/3.4.4/d1/d89/tutorial_py_orb.html)
 - [Robust image matching via ORB feature and VFC for mismatch removal](https://www.spiedigitallibrary.org/conference-proceedings-of-spie/10609/2283260/Robust-image-matching-via-ORB-feature-and-VFC-for-mismatch/10.1117/12.2283260.short)

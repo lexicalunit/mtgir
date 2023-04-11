@@ -1,5 +1,12 @@
 """Example code that uses a convolutional neural network to recognize cards."""
 
+# Required dependencies:
+# python = ">=3.10, <3.12"
+# efficientnet = "^1.1"
+# tensorflow = {version = "<=2.12", markers = "sys_platform != 'darwin'"}
+# tensorflow-macos = {version = "<=2.12", markers = "sys_platform == 'darwin'"}
+# tensorflow-metal = {version = "<=0.8", markers = "sys_platform == 'darwin'"}
+
 from __future__ import annotations
 
 from pathlib import Path
