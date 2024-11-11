@@ -675,10 +675,9 @@ class CardCandidate:
         return bool(other.bounding_quad.within(self.bounding_quad) and other.gid == self.gid)
 
 
-def best_matches(data: dict[str, ImageHash], filename: str | Path) -> list[CardCandidate]:
-    global db
-    assert db is not None
-
+def best_matches(
+    db: dict[str, Any], data: dict[str, ImageHash], filename: str | Path
+) -> list[CardCandidate]:
     img = cv.imread(str(filename))
     lab = cv.cvtColor(img, cv.COLOR_BGR2LAB)
     lightness, redness, yellowness = cv.split(lab)
@@ -749,9 +748,12 @@ def best_matches(data: dict[str, ImageHash], filename: str | Path) -> list[CardC
     for candidate in candidate_list:
         if candidate.is_recognized and not candidate.is_fragment:
             if candidate.gid not in unique_gids:
-                candidate.uri = db[candidate.gid]["uri"]
+                gid = candidate.gid
+                if any(gid.endswith(face) for face in ("back", "front")):
+                    gid, _ = gid.rsplit("-", 1)
+                candidate.uri = db[gid]["uri"]
                 recognized_list.append(candidate)
-                unique_gids.add(candidate.gid)
+                unique_gids.add(gid)
 
     ranked = sorted(recognized_list, key=lambda x: x.recognition_score, reverse=True)
     return list(ranked)
@@ -810,19 +812,20 @@ def match_results(file: str | Path) -> list[Result]:
     assert data is not None
     assert db is not None
 
-    matches = best_matches(data, file)
+    matches = best_matches(db, data, file)
     if not matches:
         return []
 
     results: list[Result] = []
     for match in matches:
+        gid = match.gid
         if any(match.gid.endswith(face) for face in ("back", "front")):
             gid, face = match.gid.rsplit("-", 1)
             target = Path(IMAGES_DIR) / f"{gid}-{face}.jpg"
         else:
             target = Path(IMAGES_DIR) / f"{match.gid}.jpg"
-        name = db[match.gid]["name"]
-        uri = db[match.gid]["scryfall_uri"]
+        name = db[gid]["name"]
+        uri = db[gid]["scryfall_uri"]
         results.append(
             Result(
                 name=name,

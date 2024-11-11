@@ -1,8 +1,11 @@
 import pytest
 
-from mtgir.cli import best_match, load_cards
+from mtgir.cli import best_matches, load_cards, load_db
 
 from . import TEST_DATA_ROOT
+
+data = load_cards(update=False)
+db = load_db()
 
 
 @pytest.mark.parametrize(
@@ -21,6 +24,7 @@ from . import TEST_DATA_ROOT
     ],
 )
 def test_best_match(test_image: str, expected_gid: str, success: bool):
-    data = load_cards(update=False)
-    gid = best_match(data, TEST_DATA_ROOT / test_image)
+    matches = best_matches(db, data, TEST_DATA_ROOT / test_image)
+    assert matches
+    gid = matches[0].gid
     assert (gid == expected_gid) is success
