@@ -11,15 +11,21 @@ version = "0.1.0"
 
 [tool.poetry.dependencies]
 click = "^8.1"
+efficientnet = "^1.1"
+fastapi = "^0.115"
 imagehash = "^4.3"
 numpy = "^1.24"
 opencv-python = "^4.7"
 python = ">=3.10, <3.12"
+python-multipart = "^0.0.17"
 requests = "^2.28"
 shapely = "^2.0"
+tensorflow = {version = "<=2.12", markers = "sys_platform != 'darwin'"}
+tensorflow-macos = {version = "<=2.12", markers = "sys_platform == 'darwin'"}
+tensorflow-metal = {version = "<=0.8", markers = "sys_platform == 'darwin'"}
+uvicorn = "^0.32.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^23"
 coverage = "^7"
 pyright = "^1"
 pytest = "^7"
@@ -40,7 +46,8 @@ max-line-length = 100
 enableTypeIgnoreComments = true
 reportMissingParameterType = true
 reportMissingTypeArgument = true
-typeCheckingMode = "basic"
+reportUnnecessaryTypeIgnoreComment = true
+typeCheckingMode = "standard"
 
 [tool.ruff]
 exclude = [".git", "env"]

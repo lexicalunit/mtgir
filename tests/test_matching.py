@@ -1,4 +1,5 @@
 import pytest
+
 from mtgir.cli import best_match, load_cards
 
 from . import TEST_DATA_ROOT

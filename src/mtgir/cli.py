@@ -5,16 +5,19 @@ import logging
 import os
 import pickle
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from functools import total_ordering
 from itertools import product
 from pathlib import Path
 from sys import exit
-from typing import Any, Optional, Union
+from typing import Any
 
 import click
 import cv2 as cv
 import numpy as np
 import requests
+import uvicorn
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from imagehash import ImageHash, phash
 from PIL import Image
 from shapely.affinity import scale
@@ -46,7 +49,7 @@ READ_MODE = cv.IMREAD_GRAYSCALE
 CLAHE: cv.CLAHE = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 
-def best_image_uri(image_uris: dict[str, str]) -> Optional[str]:
+def best_image_uri(image_uris: dict[str, str]) -> str | None:
     for pref in IMAGE_PREFERENCES:
         if uri := image_uris.get(pref):
             return uri
@@ -62,7 +65,7 @@ def download_card(dest: Path, datum: dict[str, Any], delete: bool = False):
         logger.info("%s exists", dest)
         return
 
-    image_uris: Optional[dict[str, str]] = datum.get("image_uris")
+    image_uris: dict[str, str] | None = datum.get("image_uris")
     if not image_uris:
         logger.warning("no image_uris in %s", datum)
         return
@@ -85,11 +88,11 @@ def download_dataset() -> bool:
     """Returns True if the dataset was updated, False otherwise."""
     r = requests.get(BULK_DATA_URL)
     assert r.status_code == 200, r.content
-    download_uri: Optional[str] = r.json().get("download_uri")
+    download_uri: str | None = r.json().get("download_uri")
     assert download_uri is not None
 
     latest_path = Path(LATEST_FILE)
-    current_latest: Optional[str] = None
+    current_latest: str | None = None
     new_latest = download_uri.split("/")[-1]
 
     if latest_path.exists():
@@ -138,14 +141,14 @@ def download_cards():
                 download_card(Path(IMAGES_DIR) / f"{gid}.jpg", datum, delete=delete)
 
 
-def hash_card(path: Union[Path, str]) -> ImageHash:
+def hash_card(path: Path | str) -> ImageHash:
     img = cv.imread(str(path))
     lab = cv.cvtColor(img, cv.COLOR_BGR2LAB)
     lightness, redness, yellowness = cv.split(lab)
     corrected_lightness = CLAHE.apply(lightness)
     limg = cv.merge((corrected_lightness, redness, yellowness))
     adjust = cv.cvtColor(limg, cv.COLOR_LAB2BGR)
-    arr = np.uint8(255 * cv.cvtColor(adjust, cv.COLOR_BGR2RGB))  # type: ignore
+    arr = np.uint8(255 * cv.cvtColor(adjust, cv.COLOR_BGR2RGB))
     return phash(Image.fromarray(arr), hash_size=32)
 
 
@@ -313,8 +316,8 @@ def line_intersection(x: cv.Mat, y: cv.Mat):
 def simplify_polygon(
     in_poly: Polygon,
     length_cutoff: float = 0.15,
-    maxiter: Optional[int] = None,
-    segment_to_remove=None,
+    maxiter: int | None = None,
+    segment_to_remove: Any | None = None,
 ):
     """
     Removes segments from a (convex) polygon by continuing neighboring
@@ -340,7 +343,7 @@ def simplify_polygon(
             k = np.argmin(d_in)
         if d_in[k] < length_cutoff * d_tot:
             ind = generate_point_indices(k - 1, k + 1, len_poly)
-            (xis, yis) = line_intersection(x_in[ind], y_in[ind])
+            (xis, yis) = line_intersection(x_in[ind], y_in[ind])  # type: ignore
             x_in[k] = xis
             y_in[k] = yis
             x_in = np.delete(x_in, (k + 1) % len_poly)
@@ -357,7 +360,7 @@ def simplify_polygon(
     return out_poly
 
 
-def generate_point_indices(index_1, index_2, max_len):
+def generate_point_indices(index_1: Any, index_2: Any, max_len: Any):
     """
     Returns the four indices that give the end points of
     polygon segments corresponding to index_1 and index_2,
@@ -368,7 +371,7 @@ def generate_point_indices(index_1, index_2, max_len):
     )
 
 
-def generate_quad_corners(indices, x, y):
+def generate_quad_corners(indices: Any, x: Any, y: Any):
     """
     Returns the four intersection points from the
     segments defined by the x coordinates (x),
@@ -376,7 +379,7 @@ def generate_quad_corners(indices, x, y):
     """
     (i, j, k, l) = indices
 
-    def gpi(index_1, index_2):
+    def gpi(index_1: Any, index_2: Any):
         return generate_point_indices(index_1, index_2, len(x))
 
     xis = np.empty(4)
@@ -500,7 +503,7 @@ def quad_corner_diff(hull_poly: Polygon, bquad_poly: Polygon, region_size: float
 
 
 def convex_hull_polygon(contour: Polygon):
-    hull = cv.convexHull(contour)
+    hull = cv.convexHull(contour)  # type: ignore
     phull = Polygon([[x, y] for (x, y) in zip(hull[:, :, 0], hull[:, :, 1])])
     return phull
 
@@ -511,7 +514,7 @@ def polygon_form_factor(poly: Polygon):
     return poly.area / (poly.length * d_0)
 
 
-def characterize_card_contour(card_contour, max_segment_area, image_area):
+def characterize_card_contour(card_contour: Any, max_segment_area: Any, image_area: Any):
     phull = convex_hull_polygon(card_contour)
     if phull.area < 0.1 * max_segment_area or phull.area < image_area / 1000.0:
         # break after card size range has been explored
@@ -542,7 +545,7 @@ def contour_image_gray(full_image: cv.Mat, thresholding: str = "adaptive"):
         )
     else:
         _, thresh = cv.threshold(gray, 70, 255, cv.THRESH_BINARY)
-    contours, _ = cv.findContours(np.uint8(thresh), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv.findContours(np.uint8(thresh), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # type: ignore
     return contours
 
 
@@ -554,9 +557,9 @@ def contour_image_rgb(full_image: cv.Mat):
     _, thr_b = cv.threshold(blue, 110, 255, cv.THRESH_BINARY)
     _, thr_g = cv.threshold(green, 110, 255, cv.THRESH_BINARY)
     _, thr_r = cv.threshold(red, 110, 255, cv.THRESH_BINARY)
-    contours_b, _ = cv.findContours(np.uint8(thr_b), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    contours_g, _ = cv.findContours(np.uint8(thr_g), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    contours_r, _ = cv.findContours(np.uint8(thr_r), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    contours_b, _ = cv.findContours(np.uint8(thr_b), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # type: ignore
+    contours_g, _ = cv.findContours(np.uint8(thr_g), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # type: ignore
+    contours_r, _ = cv.findContours(np.uint8(thr_r), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # type: ignore
     contours = contours_b + contours_g + contours_r
     return contours
 
@@ -592,7 +595,7 @@ def phash_diff(phashes: list[ImageHash], phash_im: ImageHash):
 def rotate_image(image: cv.Mat, angle: float) -> cv.Mat:
     from scipy.ndimage import rotate
 
-    return rotate(image, angle)
+    return rotate(image, angle)  # type: ignore
     # image_center = tuple(np.array(image.shape[1::-1]) / 2)
     # rot_mat = cv.getRotationMatrix2D(image_center, angle, 1.0)
     # result = cv.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv.INTER_LINEAR)
@@ -653,7 +656,7 @@ class CardCandidate:
         return bool(other.bounding_quad.within(self.bounding_quad) and other.gid == self.gid)
 
 
-def best_match(data: dict[str, ImageHash], filename: Union[str, Path]) -> Optional[str]:
+def best_match(data: dict[str, ImageHash], filename: str | Path) -> str | None:
     img = cv.imread(str(filename))
     lab = cv.cvtColor(img, cv.COLOR_BGR2LAB)
     lightness, redness, yellowness = cv.split(lab)
@@ -670,7 +673,7 @@ def best_match(data: dict[str, ImageHash], filename: Union[str, Path]) -> Option
     full_image = adjust.copy()
     image_area = full_image.shape[0] * full_image.shape[1]
     max_segment_area = 0.01  # largest card area
-    contours = contour_image(full_image, mode=alg)
+    contours = contour_image(full_image, mode=alg)  # type: ignore
     for card_contour in contours:
         try:
             (
@@ -700,8 +703,8 @@ def best_match(data: dict[str, ImageHash], filename: Union[str, Path]) -> Option
                 yfact=crop_factor,
                 origin="centroid",
             )
-            warped = four_point_transform(full_image, scaled)
-            candidate = CardCandidate(warped, bounding_poly, bounding_poly.area / image_area)
+            warped = four_point_transform(full_image, scaled)  # type: ignore
+            candidate = CardCandidate(warped, bounding_poly, bounding_poly.area / image_area)  # type: ignore
             candidate_list.append(candidate)
 
     for candidate in candidate_list:
@@ -730,6 +733,57 @@ def best_match(data: dict[str, ImageHash], filename: Union[str, Path]) -> Option
     return best.gid if best is not None else None
 
 
+data: dict[str, ImageHash] | None = None
+app = FastAPI()
+
+
+@app.post("/match")
+async def match(file: UploadFile = File(...)):
+    assert data is not None
+    now = datetime.now(timezone.utc)
+    output = Path() / "matches" / f"{now.timestamp()}.jpg"
+    try:
+        if file.content_type != "image/jpeg":
+            raise HTTPException(status_code=400, detail="Only JPEG files are allowed")
+        contents = file.file.read()
+        with Path.open(output, "wb") as f:
+            f.write(contents)
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail="Something went wrong")
+    finally:
+        file.file.close()
+
+    if not (m := match_file(output)):
+        return {"message": "No match found"}
+    return {"message": "Match found", "name": m.name, "target": m.target}
+
+
+class Result:
+    def __init__(self, name: str, target: str) -> None:
+        self.name = name
+        self.target = target
+
+
+def match_file(file: str | Path) -> Result | None:
+    global data
+    assert data is not None
+    gid = best_match(data, file)
+    if gid is None:
+        return None
+
+    db = load_db()
+    if any(gid.endswith(face) for face in ("back", "front")):
+        gid, face = gid.rsplit("-", 1)
+        target = Path(IMAGES_DIR) / f"{gid}-{face}.jpg"
+    else:
+        target = Path(IMAGES_DIR) / f"{gid}.jpg"
+    name = db[gid]["name"]
+
+    return Result(name, str(target))
+
+
 @click.command()
 @click.option(
     "--download",
@@ -745,12 +799,21 @@ def best_match(data: dict[str, ImageHash], filename: Union[str, Path]) -> Option
     default=False,
     help="force update the image cache",
 )
+@click.option(
+    "--api",
+    is_flag=True,
+    default=False,
+    help="run as a HTTP server",
+)
 @click.argument("filename", required=False)
 def main(
     download: bool,
     update: bool,
-    filename: Optional[str],
+    api: bool,
+    filename: str | None,
 ) -> int:
+    global data
+
     if download:
         if needs_update := download_dataset():
             update = needs_update
@@ -758,20 +821,16 @@ def main(
 
     data = load_cards(update)
 
-    if filename is not None:
-        gid = best_match(data, filename)
-        if gid is None:
-            print("I don't know what that is.")
-            return 1
+    if api:
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+        return 0
 
-        db = load_db()
-        if any(gid.endswith(face) for face in ("back", "front")):
-            gid, face = gid.rsplit("-", 1)
-            target = Path(IMAGES_DIR) / f"{gid}-{face}.jpg"
-        else:
-            target = Path(IMAGES_DIR) / f"{gid}.jpg"
-        name = db[gid]["name"]
+    if filename is None:
+        return 0
 
-        print(f"That's {name} ({target})!")
+    if not (m := match_file(filename)):
+        print("no match found")
+        return 1
 
+    print(f"{m.name} -> {m.target}")
     return 0

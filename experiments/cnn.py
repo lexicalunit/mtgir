@@ -16,8 +16,8 @@ import numpy as np
 import tensorflow as tf
 from efficientnet.tfkeras import EfficientNetB4
 from PIL import Image
-from tensorflow.keras.optimizers.legacy import Adam
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.optimizers.legacy import Adam  # type: ignore
+from tensorflow.keras.preprocessing.image import ImageDataGenerator  # type: ignore
 
 IMAGES_DIR = "images"
 BATCH_SIZE = 32
@@ -86,7 +86,7 @@ def train_model():
 
 def preprocess_image(path: str):
     img = Image.open(path)
-    img = img.resize(IMAGE_SIZE, Image.ANTIALIAS)
+    img = img.resize(IMAGE_SIZE, Image.ANTIALIAS)  # type: ignore
     img = np.array(img) / 255.0
     img = np.expand_dims(img, axis=0)
     return img
@@ -97,7 +97,7 @@ def recognize_magic_card(path: str):
     paths_by_index = dict(zip(range(len(paths)), paths))
     model = tf.keras.models.load_model(MODEL_PATH)
     img = preprocess_image(path)
-    prediction = model.predict(img)
+    prediction = model.predict(img)  # type: ignore
     predicted_class = np.argmax(prediction, axis=-1)[0]
     return paths_by_index[predicted_class]
 
