@@ -10,7 +10,7 @@ from functools import total_ordering
 from itertools import product
 from pathlib import Path
 from sys import exit
-from typing import Any, cast
+from typing import Any, Sequence, cast
 
 import click
 import cv2 as cv
@@ -555,7 +555,7 @@ def contour_image_gray(full_image: cv.typing.MatLike, thresholding: str = "adapt
     return contours
 
 
-def contour_image_rgb(full_image: cv.typing.MatLike):
+def contour_image_rgb(full_image: cv.typing.MatLike) -> Sequence[cv.typing.MatLike]:
     blue, green, red = cv.split(full_image)
     blue = CLAHE.apply(blue)
     green = CLAHE.apply(green)
@@ -578,8 +578,7 @@ def contour_image_rgb(full_image: cv.typing.MatLike):
         cv.RETR_TREE,
         cv.CHAIN_APPROX_SIMPLE,
     )
-    contours = contours_b + contours_g + contours_r  # type: ignore
-    return contours
+    return list(contours_b) + list(contours_g) + list(contours_r)
 
 
 def contour_image(full_image: cv.typing.MatLike, mode: str = "gray"):
@@ -590,8 +589,8 @@ def contour_image(full_image: cv.typing.MatLike, mode: str = "gray"):
     elif mode == "rgb":
         contours = contour_image_rgb(full_image)
     elif mode == "all":
-        contours = contour_image_gray(full_image, thresholding="simple")
-        contours += contour_image_gray(full_image, thresholding="adaptive")  # type: ignore
+        contours = list(contour_image_gray(full_image, thresholding="simple"))
+        contours += contour_image_gray(full_image, thresholding="adaptive")
         contours += contour_image_rgb(full_image)
     else:
         raise ValueError("Unknown segmentation mode.")
@@ -610,14 +609,24 @@ def phash_diff(phashes: list[ImageHash], phash_im: ImageHash):
     return diff
 
 
-def rotate_image(image: cv.Mat, angle: float) -> cv.Mat:
-    from scipy.ndimage import rotate
+def rotate_image(image: cv.typing.MatLike, angle: float) -> cv.typing.MatLike:
+    # from scipy.ndimage import rotate
 
-    return rotate(image, angle)  # type: ignore
-    # image_center = tuple(np.array(image.shape[1::-1]) / 2)
-    # rot_mat = cv.getRotationMatrix2D(image_center, angle, 1.0)
-    # result = cv.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv.INTER_LINEAR)
-    # return result
+    # rotated_image = rotate(image, angle)
+    # return rotated_image
+
+    w, h = image.shape[1::-1]
+    center = tuple(np.array((w, h)) / 2)
+    rot_mat = cv.getRotationMatrix2D(center, angle, 1.0)
+    cos = np.abs(rot_mat[0, 0])
+    sin = np.abs(rot_mat[0, 1])
+    new_w = int((h * sin) + (w * cos))
+    new_h = int((h * cos) + (w * sin))
+    rot_mat[0, 2] += (new_w / 2) - center[0]
+    rot_mat[1, 2] += (new_h / 2) - center[1]
+    rotated_image = cv.warpAffine(image, rot_mat, (new_w, new_h), flags=cv.INTER_LINEAR)
+    rotated_image = rotated_image[1:-1, 1:-1]
+    return rotated_image
 
 
 def phash_compare(data: dict[str, ImageHash], im_seg: cv.Mat):
@@ -676,7 +685,9 @@ class CardCandidate:
 
 
 def best_matches(
-    db: dict[str, Any], data: dict[str, ImageHash], filename: str | Path
+    db: dict[str, Any],
+    data: dict[str, ImageHash],
+    filename: str | Path,
 ) -> list[CardCandidate]:
     img = cv.imread(str(filename))
     lab = cv.cvtColor(img, cv.COLOR_BGR2LAB)
