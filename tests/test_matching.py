@@ -1,11 +1,28 @@
-import pytest
+from __future__ import annotations
 
-from mtgir.cli import best_matches, load_cards, load_db
+from typing import Any
+
+import pytest
+from imagehash import ImageHash
+
+from mtgir.ir import best_matches
+from mtgir.scryfall import load_cards, load_db
 
 from . import TEST_DATA_ROOT
 
-data = load_cards(update=False)
-db = load_db()
+
+@pytest.fixture(scope="session")
+def db() -> dict[str, Any]:
+    result = load_db()
+    assert result
+    return result
+
+
+@pytest.fixture(scope="session")
+def data() -> dict[str, ImageHash]:
+    result = load_cards(update=False)
+    assert result
+    return result
 
 
 @pytest.mark.parametrize(
@@ -23,7 +40,13 @@ db = load_db()
         ("test_skullclamp.jpg", "6daf6ed5-4f55-4ba2-99a2-9a50ea36888f", False),
     ],
 )
-def test_best_match(test_image: str, expected_gid: str, success: bool):
+def test_best_match(
+    test_image: str,
+    expected_gid: str,
+    success: bool,
+    db: dict[str, Any],
+    data: dict[str, ImageHash],
+):
     matches = best_matches(db, data, TEST_DATA_ROOT / test_image)
     assert matches
     gid = matches[0].gid

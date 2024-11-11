@@ -37,15 +37,12 @@ ruff = "^0"
 [tool.poetry.scripts]
 mtgir = 'mtgir:main'
 
-[tool.black]
-include = '\.pyi?$'
-line-length = 100
-
 [tool.pylint]
 max-line-length = 100
 
 [tool.pyright]
 enableTypeIgnoreComments = true
+exclude = ["experiments/**"]
 reportMissingParameterType = true
 reportMissingTypeArgument = true
 reportUnnecessaryTypeIgnoreComment = true
