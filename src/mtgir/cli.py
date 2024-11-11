@@ -10,7 +10,7 @@ from functools import total_ordering
 from itertools import product
 from pathlib import Path
 from sys import exit
-from typing import Any
+from typing import Any, cast
 
 import click
 import cv2 as cv
@@ -231,7 +231,7 @@ def order_polygon_points(
     return (x[ind], y[ind])
 
 
-def four_point_transform(image: cv.Mat, poly: Polygon):
+def four_point_transform(image: cv.typing.MatLike, poly: Polygon):
     """
     A perspective transform for a quadrilateral polygon.
     Slightly modified version of the same function from
@@ -290,7 +290,7 @@ def four_point_transform(image: cv.Mat, poly: Polygon):
     return warped
 
 
-def line_intersection(x: cv.Mat, y: cv.Mat):
+def line_intersection(x: cv.typing.MatLike, y: cv.typing.MatLike):
     """
     Calculates the intersection point of two lines, defined by the points
     (x1, y1) and (x2, y2) (first line), and
@@ -344,7 +344,7 @@ def simplify_polygon(
             k = np.argmin(d_in)
         if d_in[k] < length_cutoff * d_tot:
             ind = generate_point_indices(k - 1, k + 1, len_poly)
-            (xis, yis) = line_intersection(x_in[ind], y_in[ind])  # type: ignore
+            (xis, yis) = line_intersection(x_in[ind], y_in[ind])
             x_in[k] = xis
             y_in[k] = yis
             x_in = np.delete(x_in, (k + 1) % len_poly)
@@ -503,8 +503,9 @@ def quad_corner_diff(hull_poly: Polygon, bquad_poly: Polygon, region_size: float
     return 1.0 - hull_corner_area / quad_corner_area
 
 
-def convex_hull_polygon(contour: Polygon):
-    hull = cv.convexHull(contour)  # type: ignore
+def convex_hull_polygon(contour: cv.typing.MatLike):
+    """Contour should be a Polygon object."""
+    hull = cv.convexHull(contour)
     phull = Polygon([[x, y] for (x, y) in zip(hull[:, :, 0], hull[:, :, 1])])
     return phull
 
@@ -537,7 +538,7 @@ def characterize_card_contour(card_contour: Any, max_segment_area: Any, image_ar
     return (continue_segmentation, is_card_candidate, bounding_poly, crop_factor)
 
 
-def contour_image_gray(full_image: cv.Mat, thresholding: str = "adaptive"):
+def contour_image_gray(full_image: cv.typing.MatLike, thresholding: str = "adaptive"):
     gray = cv.cvtColor(full_image, cv.COLOR_BGR2GRAY)
     if thresholding == "adaptive":
         fltr_size = 1 + 2 * (min(full_image.shape[0], full_image.shape[1]) // 20)
@@ -546,11 +547,15 @@ def contour_image_gray(full_image: cv.Mat, thresholding: str = "adaptive"):
         )
     else:
         _, thresh = cv.threshold(gray, 70, 255, cv.THRESH_BINARY)
-    contours, _ = cv.findContours(np.uint8(thresh), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # type: ignore
+    contours, _ = cv.findContours(
+        cast(cv.typing.MatLike, np.uint8(thresh)),
+        cv.RETR_TREE,
+        cv.CHAIN_APPROX_SIMPLE,
+    )
     return contours
 
 
-def contour_image_rgb(full_image: cv.Mat):
+def contour_image_rgb(full_image: cv.typing.MatLike):
     blue, green, red = cv.split(full_image)
     blue = CLAHE.apply(blue)
     green = CLAHE.apply(green)
@@ -558,14 +563,26 @@ def contour_image_rgb(full_image: cv.Mat):
     _, thr_b = cv.threshold(blue, 110, 255, cv.THRESH_BINARY)
     _, thr_g = cv.threshold(green, 110, 255, cv.THRESH_BINARY)
     _, thr_r = cv.threshold(red, 110, 255, cv.THRESH_BINARY)
-    contours_b, _ = cv.findContours(np.uint8(thr_b), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # type: ignore
-    contours_g, _ = cv.findContours(np.uint8(thr_g), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # type: ignore
-    contours_r, _ = cv.findContours(np.uint8(thr_r), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)  # type: ignore
-    contours = contours_b + contours_g + contours_r
+    contours_b, _ = cv.findContours(
+        cast(cv.typing.MatLike, np.uint8(thr_b)),
+        cv.RETR_TREE,
+        cv.CHAIN_APPROX_SIMPLE,
+    )
+    contours_g, _ = cv.findContours(
+        cast(cv.typing.MatLike, np.uint8(thr_g)),
+        cv.RETR_TREE,
+        cv.CHAIN_APPROX_SIMPLE,
+    )
+    contours_r, _ = cv.findContours(
+        cast(cv.typing.MatLike, np.uint8(thr_r)),
+        cv.RETR_TREE,
+        cv.CHAIN_APPROX_SIMPLE,
+    )
+    contours = contours_b + contours_g + contours_r  # type: ignore
     return contours
 
 
-def contour_image(full_image: cv.Mat, mode: str = "gray"):
+def contour_image(full_image: cv.typing.MatLike, mode: str = "gray"):
     if mode == "gray":
         contours = contour_image_gray(full_image, thresholding="simple")
     elif mode == "adaptive":
@@ -574,7 +591,7 @@ def contour_image(full_image: cv.Mat, mode: str = "gray"):
         contours = contour_image_rgb(full_image)
     elif mode == "all":
         contours = contour_image_gray(full_image, thresholding="simple")
-        contours += contour_image_gray(full_image, thresholding="adaptive")
+        contours += contour_image_gray(full_image, thresholding="adaptive")  # type: ignore
         contours += contour_image_rgb(full_image)
     else:
         raise ValueError("Unknown segmentation mode.")
@@ -645,19 +662,23 @@ def phash_compare(data: dict[str, ImageHash], im_seg: cv.Mat):
 
 @dataclass
 class CardCandidate:
-    image: cv.Mat
+    image: cv.typing.MatLike
     bounding_quad: Polygon
     image_area_fraction: float
     is_recognized: bool = False
     recognition_score: float = 0.0
     is_fragment: bool = False
     gid: str = "unknown"
+    uri: str = "unknown"
 
     def contains(self, other: CardCandidate):
         return bool(other.bounding_quad.within(self.bounding_quad) and other.gid == self.gid)
 
 
-def best_match(data: dict[str, ImageHash], filename: str | Path) -> str | None:
+def best_matches(data: dict[str, ImageHash], filename: str | Path) -> list[CardCandidate]:
+    global db
+    assert db is not None
+
     img = cv.imread(str(filename))
     lab = cv.cvtColor(img, cv.COLOR_BGR2LAB)
     lightness, redness, yellowness = cv.split(lab)
@@ -674,7 +695,7 @@ def best_match(data: dict[str, ImageHash], filename: str | Path) -> str | None:
     full_image = adjust.copy()
     image_area = full_image.shape[0] * full_image.shape[1]
     max_segment_area = 0.01  # largest card area
-    contours = contour_image(full_image, mode=alg)  # type: ignore
+    contours = contour_image(full_image, mode=alg)
     for card_contour in contours:
         try:
             (
@@ -704,8 +725,8 @@ def best_match(data: dict[str, ImageHash], filename: str | Path) -> str | None:
                 yfact=crop_factor,
                 origin="centroid",
             )
-            warped = four_point_transform(full_image, scaled)  # type: ignore
-            candidate = CardCandidate(warped, bounding_poly, bounding_poly.area / image_area)  # type: ignore
+            warped = four_point_transform(full_image, scaled)
+            candidate = CardCandidate(warped, bounding_poly, bounding_poly.area / image_area)
             candidate_list.append(candidate)
 
     for candidate in candidate_list:
@@ -724,17 +745,20 @@ def best_match(data: dict[str, ImageHash], filename: str | Path) -> str | None:
             ) = phash_compare(data, im_seg)
 
     recognized_list = []
+    unique_gids = set()
     for candidate in candidate_list:
         if candidate.is_recognized and not candidate.is_fragment:
-            recognized_list.append(candidate)
+            if candidate.gid not in unique_gids:
+                candidate.uri = db[candidate.gid]["uri"]
+                recognized_list.append(candidate)
+                unique_gids.add(candidate.gid)
 
     ranked = sorted(recognized_list, key=lambda x: x.recognition_score, reverse=True)
-    # print(list((r.gid, r.recognition_score) for r in ranked))
-    best = ranked[0]
-    return best.gid if best is not None else None
+    return list(ranked)
 
 
 data: dict[str, ImageHash] | None = None
+db: dict[str, Any] | None = None
 app = FastAPI()
 
 
@@ -756,33 +780,59 @@ async def match(file: UploadFile = File(...)):
     finally:
         file.file.close()
 
-    if not (m := match_file(output)):
-        return {"message": "No match found"}
-    return {"message": "Match found", "name": m.name, "target": m.target}
+    if not (matches := match_results(output)):
+        return {"message": "No matches found"}
+    return {
+        "message": "Matches found",
+        "matches": [
+            {
+                "name": m.name,
+                "target": m.target,
+                "uri": m.uri,
+                "score": m.score,
+            }
+            for m in matches
+        ],
+    }
 
 
+@dataclass
 class Result:
-    def __init__(self, name: str, target: str) -> None:
-        self.name = name
-        self.target = target
+    name: str
+    target: str
+    uri: str
+    score: float
 
 
-def match_file(file: str | Path) -> Result | None:
+def match_results(file: str | Path) -> list[Result]:
     global data
+    global db
     assert data is not None
-    gid = best_match(data, file)
-    if gid is None:
-        return None
+    assert db is not None
 
-    db = load_db()
-    if any(gid.endswith(face) for face in ("back", "front")):
-        gid, face = gid.rsplit("-", 1)
-        target = Path(IMAGES_DIR) / f"{gid}-{face}.jpg"
-    else:
-        target = Path(IMAGES_DIR) / f"{gid}.jpg"
-    name = db[gid]["name"]
+    matches = best_matches(data, file)
+    if not matches:
+        return []
 
-    return Result(name, str(target))
+    results: list[Result] = []
+    for match in matches:
+        if any(match.gid.endswith(face) for face in ("back", "front")):
+            gid, face = match.gid.rsplit("-", 1)
+            target = Path(IMAGES_DIR) / f"{gid}-{face}.jpg"
+        else:
+            target = Path(IMAGES_DIR) / f"{match.gid}.jpg"
+        name = db[match.gid]["name"]
+        uri = db[match.gid]["scryfall_uri"]
+        results.append(
+            Result(
+                name=name,
+                target=str(target),
+                uri=uri,
+                score=match.recognition_score,
+            )
+        )
+
+    return results
 
 
 @click.command()
@@ -814,6 +864,7 @@ def main(
     filename: str | None,
 ) -> int:
     global data
+    global db
 
     if download:
         if needs_update := download_dataset():
@@ -821,6 +872,7 @@ def main(
         download_cards()
 
     data = load_cards(update)
+    db = load_db()
 
     if api:
         uvicorn.run(app, host="0.0.0.0", port=8000)
@@ -829,9 +881,10 @@ def main(
     if filename is None:
         return 0
 
-    if not (m := match_file(filename)):
+    if not (matches := match_results(filename)):
         print("no match found")
         return 1
 
-    print(f"{m.name} -> {m.target}")
+    for match in matches:
+        print(f"[{match.score:.2f}] {match.name} -> {match.target} ({match.uri})")
     return 0
