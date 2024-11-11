@@ -38,7 +38,7 @@ BULK_DATA_URL = "https://api.scryfall.com/bulk-data/unique-artwork"
 IMAGE_PREFERENCES = ("large", "border_crop", "normal")
 INVALID_SET_NAMES = {"Substitute Cards"}
 INVALID_SET_TYPES = {"memorabilia"}
-INVALID_TYPES = {"Basic Land"}
+INVALID_TYPES = {"Basic Land", "Vanguard"}
 SCRYFALL_JSON_FILE = "unique-artwork.json"
 
 # OpenCV config
@@ -122,7 +122,8 @@ def download_cards():
                 logger.error("missing id in %s", datum)
                 exit(1)
 
-            delete = "paper" not in datum.get("games", []) or datum.get("digital")
+            games = set(datum.get("games", []))
+            delete = not games.intersection({"paper", "mtgo"})  # or datum.get("digital")
             delete = delete or datum.get("set_type") in INVALID_SET_TYPES
             delete = delete or any(n in datum.get("set_name") for n in INVALID_SET_NAMES)
             if type_line := datum.get("type_line"):
