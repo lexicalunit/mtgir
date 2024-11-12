@@ -24,12 +24,13 @@ IMAGES_DIR = "images"
 LATEST_FILE = "latest"
 
 # scryfall config
-BULK_DATA_URL = "https://api.scryfall.com/bulk-data/unique-artwork"
+# BULK_DATA_URL = "https://api.scryfall.com/bulk-data/unique-artwork"  # half the size
+BULK_DATA_URL = "https://api.scryfall.com/bulk-data/default-cards"
 IMAGE_PREFERENCES = ("large", "border_crop", "normal")
 INVALID_SET_NAMES = {"Substitute Cards"}
 INVALID_SET_TYPES = {"memorabilia"}
 INVALID_TYPES = {"Basic Land", "Vanguard"}
-SCRYFALL_JSON_FILE = "unique-artwork.json"
+SCRYFALL_JSON_FILE = "db.json"
 
 CLAHE: cv.CLAHE = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
@@ -61,8 +62,9 @@ def download_card(dest: Path, datum: dict[str, Any], delete: bool = False):
         exit(1)
 
     try:
-        logger.info("downloading %s...", uri)
+        logger.info("downloading %s ...", uri)
         r = requests.get(uri, allow_redirects=True)
+        dest.parent.mkdir(parents=True, exist_ok=True)
         with open(dest, "wb") as f:
             f.write(r.content)
     except Exception as e:
@@ -97,6 +99,10 @@ def download_dataset() -> bool:
     return True
 
 
+def base_image_path(gid: str) -> Path:
+    return Path(IMAGES_DIR) / gid[0] / gid[1]
+
+
 def download_cards():
     Path(IMAGES_DIR).mkdir(exist_ok=True)
     with open(SCRYFALL_JSON_FILE) as df:
@@ -108,6 +114,7 @@ def download_cards():
                 exit(1)
 
             games = set(datum.get("games", []))
+            # TODO: Maybe we can delete digital now that we're using the default db?
             delete = not games.intersection({"paper", "mtgo"})  # or datum.get("digital")
             delete = delete or datum.get("set_type") in INVALID_SET_TYPES
             delete = delete or any(n in datum.get("set_name") for n in INVALID_SET_NAMES)
@@ -119,12 +126,12 @@ def download_cards():
                 and len(faces) == 2
                 and all("image_uris" in face for face in faces)
             ):
-                front = Path(IMAGES_DIR) / f"{gid}-front.jpg"
-                back = Path(IMAGES_DIR) / f"{gid}-back.jpg"
+                front = base_image_path(gid) / f"{gid}-front.jpg"
+                back = base_image_path(gid) / f"{gid}-back.jpg"
                 download_card(front, faces[0], delete=delete)
                 download_card(back, faces[1], delete=delete)
             else:
-                download_card(Path(IMAGES_DIR) / f"{gid}.jpg", datum, delete=delete)
+                download_card(base_image_path(gid) / f"{gid}.jpg", datum, delete=delete)
 
 
 def hash_card(path: Path | str) -> ImageHash:
@@ -151,17 +158,18 @@ def load_cards(update: bool) -> dict[str, ImageHash]:
 
     dir = Path(IMAGES_DIR)
 
-    for fname in os.listdir(dir):
-        if not fname.endswith(".jpg"):
-            continue
-        gid = fname[0:-4]
-        if gid in data:
-            logger.info("%s is cached", gid)
-            continue
-        logger.info("loading %s...", gid)
-        f = dir / fname
-        assert f.is_file()
-        data[gid] = hash_card(f)
+    for root, _, files in os.walk(dir):
+        for fname in files:
+            if not fname.endswith(".jpg"):
+                continue
+            gid = fname[0:-4]
+            if gid in data:
+                logger.info("%s is cached", gid)
+                continue
+            logger.info("loading %s ...", gid)
+            f = Path(root) / fname
+            assert f.is_file()
+            data[gid] = hash_card(f)
 
     with open(cache, "wb") as f:
         pickle.dump(data, f)

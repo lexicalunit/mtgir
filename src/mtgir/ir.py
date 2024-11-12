@@ -15,7 +15,7 @@ from shapely.affinity import scale
 from shapely.geometry import LineString
 from shapely.geometry.polygon import Polygon
 
-from .scryfall import CLAHE, IMAGES_DIR
+from .scryfall import CLAHE, base_image_path
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -462,6 +462,10 @@ def rotate_image(image: cv.typing.MatLike, angle: float) -> cv.typing.MatLike:
     return rotated_image
 
 
+gids: list[str] | None = None
+phashes: list[ImageHash] | None = None
+
+
 def phash_compare(data: dict[str, ImageHash], im_seg: cv.Mat):
     """
     Runs perceptive hash comparison between given image and
@@ -474,8 +478,13 @@ def phash_compare(data: dict[str, ImageHash], im_seg: cv.Mat):
     best_score = 0.0
     best_gid = "unknown"
     n_cards = len(data)
-    gids = list(data.keys())
-    phashes = list(data.values())
+
+    global gids
+    global phashes
+    if gids is None:
+        gids = list(data.keys())
+    if phashes is None:
+        phashes = list(data.values())
 
     d_0_dist = np.zeros(n_rotations)
     d_0 = np.zeros((n_cards, n_rotations))
@@ -512,6 +521,7 @@ class CardCandidate:
     is_fragment: bool = False
     gid: str = "unknown"
     uri: str = "unknown"
+    name: str = "unknown"
 
     def contains(self, other: CardCandidate):
         return bool(other.bounding_quad.within(self.bounding_quad) and other.gid == self.gid)
@@ -550,12 +560,10 @@ def best_matches(
         except NotImplementedError:
             # this can occur in Shapely for some funny contour shapes
             # resolve by discarding the candidate
-            (continue_segmentation, is_card_candidate, bounding_poly, crop_factor) = (
-                True,
-                False,
-                None,
-                1.0,
-            )
+            continue_segmentation = True
+            is_card_candidate = False
+            bounding_poly = None
+            crop_factor = 1.0
         if not continue_segmentation:
             break
         if is_card_candidate:
@@ -596,6 +604,7 @@ def best_matches(
                 if any(gid.endswith(face) for face in ("back", "front")):
                     gid, _ = gid.rsplit("-", 1)
                 candidate.uri = cast(dict[str, Any], db)[gid]["uri"]
+                candidate.name = cast(dict[str, Any], db)[gid]["name"]
                 recognized_list.append(candidate)
                 unique_gids.add(gid)
 
@@ -627,9 +636,9 @@ def match_results(
         gid = match.gid
         if any(match.gid.endswith(face) for face in ("back", "front")):
             gid, face = match.gid.rsplit("-", 1)
-            target = Path(IMAGES_DIR) / f"{gid}-{face}.jpg"
+            target = base_image_path(gid) / f"{gid}-{face}.jpg"
         else:
-            target = Path(IMAGES_DIR) / f"{match.gid}.jpg"
+            target = base_image_path(gid) / f"{match.gid}.jpg"
         name = cast(dict[str, Any], db)[gid]["name"]
         uri = cast(dict[str, Any], db)[gid]["scryfall_uri"]
         results.append(

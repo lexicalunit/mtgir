@@ -29,11 +29,19 @@ from .scryfall import download_cards, download_dataset, load_cards, load_db
     default=False,
     help="run as a HTTP server",
 )
+@click.option(
+    "--show",
+    "-s",
+    required=False,
+    default=None,
+    help="Show the images in the dataset of cards with the given name",
+)
 @click.argument("filename", required=False)
 def main(
     download: bool,
     update: bool,
     api: bool,
+    show: str | None,
     filename: str | None,
 ) -> int:
     if api:
@@ -45,12 +53,21 @@ def main(
             update = needs_update
         download_cards()
 
-    if filename is None:
+    if not filename and not show:
+        return 0
+
+    db = load_db()
+
+    if show:
+        for gid, card in db.items():
+            if card["name"].lower() != show.lower():
+                continue
+            print(f"images/{gid[0]}/{gid[1]}/{gid}.jpg: {card['name']}")
         return 0
 
     data = load_cards(update)
-    db = load_db()
 
+    assert filename
     if not (matches := match_results(db, data, filename)):
         print("no match found")
         return 1

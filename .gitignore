@@ -7,7 +7,7 @@
 /coverage
 /images*
 /latest
-/unique-artwork.json
+/db*.json
 /cache*
 /matches
 /*.jpg
