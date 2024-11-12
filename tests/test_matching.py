@@ -36,6 +36,7 @@ def data() -> dict[str, ImageHash]:
         ("test_neheb.jpg", "Neheb, Dreadhorde Champion", True),
         ("test_beastmaster.jpg", "Beastmaster Ascension", True),
         ("test_young_pyro.jpg", "Young Pyromancer", True),
+        ("test_valakut_exploration.jpg", "Valakut Exploration", True),
         # For some reason I just can't get skullclamp to work at all,
         # even with pristine input images. I'm not sure what's going on.
         ("test_skullclamp.jpg", "Skullclamp", False),
