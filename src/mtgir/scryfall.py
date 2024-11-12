@@ -24,13 +24,17 @@ IMAGES_DIR = "images"
 LATEST_FILE = "latest"
 
 # scryfall config
-# BULK_DATA_URL = "https://api.scryfall.com/bulk-data/unique-artwork"  # half the size
-BULK_DATA_URL = "https://api.scryfall.com/bulk-data/default-cards"
 IMAGE_PREFERENCES = ("large", "border_crop", "normal")
 INVALID_SET_NAMES = {"Substitute Cards"}
 INVALID_SET_TYPES = {"memorabilia"}
 INVALID_TYPES = {"Basic Land", "Vanguard"}
 SCRYFALL_JSON_FILE = "db.json"
+
+# The unique-artwork dataset is half the size of the default-cards dataset, but it
+# doesn't seem to offer any better accuracy in image recognition. In fact, using the
+# larger dataset actually makes the performance worse, doubling the processing time.
+BULK_DATA_URL = "https://api.scryfall.com/bulk-data/unique-artwork"
+# BULK_DATA_URL = "https://api.scryfall.com/bulk-data/default-cards"
 
 CLAHE: cv.CLAHE = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
